@@ -36,6 +36,11 @@
 #define GPS_X 1
 #define GPS_Y 0
 #define GPS_MIN_SAT_COUNT 4     // number of sats to trigger low sat count sanity check
+//constants for mgrs osd element
+#define EqatorialRadius 6378137 //radius of the equator in m
+#define ScaleFactor .9996 
+#define EccentricitySquared .00669438
+
 
 #ifdef USE_GPS_UBLOX
 typedef enum {

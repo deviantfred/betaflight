@@ -418,7 +418,83 @@ static void osdFormatCoordinate(char *buff, gpsCoordinateType_e coordinateType, 
         break;
     }
 }
+
+osdFormatMgrs(char *buff, osdElementType_e variantType){
+    const long int divider = 10000000;
+    double lat = ((double)(gpsSol.llh.lat*divider))/divider;
+    double longitude = ((double)(gpsSol.llh.lon*divider))/divider;
+
+    //variable declarations
+    double backgroundarr[7]; //array for map reprojection cals(utmzone, meridian, N, T, C, A, M)
+    char latband;//utm lattitude band key
+    double easting;//utm easting
+    double northing;//utm northing
+    char squareId[2];//100,000m square id 
+    int mgrseasting;//mgrs easting
+    int mgrsnorthing;//mgrs northing
+    
+    //static values
+    char latbandkey[20] = {/*equator->up*/'N','P','Q','R','S','T','U','V','W','X',/*equator->down*/'M','L','K','J','H','G','F','E','D','C'};//GZD lattitude band key
+    char vertzonedesignatorkeyod[24] = {'A','B','C','D','E','F','G','H','J','K','L','M','N','P','Q','R','S','T','U','V'};//key for 100,000m square id northing odd zones
+    char vertzonedesignatorkeyev[24] = {'F','G','H','J','K','L','M','N','P','Q','R','S','T','U','V','A','B','C','D','E'};//key for 100,000m square id northing even zones
+    char horzonedesignatorkey[3][8] = {{'A','B','C','D','E','F','G','H'},{'J','K','L','M','N','P','Q','R'},{'S','T','U','V','W','X','Y','Z'}};//key for 100,000m square id easting
+    
+    
+    //below are some calulations that several of the equations contain, only doing the math once to save compute cycles
+    double latpidiv = lat*3.141592658979/180;
+    double EccentricitySquaredsquared = EccentricitySquared*EccentricitySquared;
+    double EccentricitySquaredcubed = EccentricitySquared*EccentricitySquared*EccentricitySquared;
+
+    
+    //background calculations for the easting and northing
+    //utmzone
+    backgroundarr[0] = (int)((longitude+180)/6)+1;
+    //centralMeridian    
+    backgroundarr[1] = (backgroundarr[0]-1)*6-180+3;
+    //N
+    backgroundarr[2] = EqatorialRadius / sqrt(1-EccentricitySquared*(sin(latpidiv)*sin(latpidiv)));
+    //T
+    backgroundarr[3] = tan(latpidiv)*tan(latpidiv);
+    //C
+    backgroundarr[4] = (EccentricitySquared * cos(latpidiv))*(EccentricitySquared * cos(latpidiv));
+    //A
+    backgroundarr[5] = cos(latpidiv)*(longitude-backgroundarr[1])*3.141592658979/180;
+    //M
+    backgroundarr[6] = EqatorialRadius*((1-EccentricitySquared/4-3*(EccentricitySquaredsquared)/64-5*(EccentricitySquaredcubed)/256)*latpidiv-(3*EccentricitySquared/8+3*(EccentricitySquaredsquared)/32+45*(EccentricitySquaredcubed)/1024)*sin(2*latpidiv)+(15*(EccentricitySquaredsquared)/256+45*(EccentricitySquaredcubed)/1024)*sin(4*latpidiv)-(35*(EccentricitySquaredcubed)/3072)*sin(6*latpidiv));
+
+    //calculate lattitude
+    //key for lattitude bands counts from the eqator up, then from the equator down
+    int latpos = lat;
+    if(lat<0){
+        
+        latpos =(latpos*-1)+80;
+    }
+    latband = latbandkey[latpos/8];
+
+    //calculate easting and northing
+    easting = ScaleFactor * backgroundarr[2] * (backgroundarr[5] + (1 - backgroundarr[3] + backgroundarr[4]) * (backgroundarr[5]*backgroundarr[5]*backgroundarr[5]) / 6 + (5 - 18 * backgroundarr[3] + (backgroundarr[3]*backgroundarr[3]) + 72 * backgroundarr[4] - 58 * EccentricitySquared) * (backgroundarr[5]*backgroundarr[5]*backgroundarr[5]*backgroundarr[5]*backgroundarr[5]) / 120) + 500000; 
+    int falsenorth;
+    double arrfivesquare = backgroundarr[5] * backgroundarr[5];
+    if(lat<0){
+        falsenorth=10000000;
+    }else{
+        falsenorth=0;
+    }
+    northing = ScaleFactor*(backgroundarr[6]+backgroundarr[2]*tan(lat*3.141592658979/180)*(arrfivesquare/2+(5-backgroundarr[3]+9*backgroundarr[4]+4*(backgroundarr[4]*backgroundarr[4]))*(arrfivesquare*arrfivesquare)/24+(61-58*backgroundarr[3]+(backgroundarr[3]*backgroundarr[3])+600*backgroundarr[4]-330*EccentricitySquared)*(arrfivesquare*arrfivesquare*arrfivesquare)/720))+falsenorth;
+    
+    mgrseasting = (int)(easting)%100000;
+    mgrsnorthing = (int)(northing)%100000;
+
+    if((int)(backgroundarr[0])%2 != 0){
+        squareId[1] = vertzonedesignatorkeyod[((int)(northing)%2000000)/100000];
+    }else{
+        squareId[1] = vertzonedesignatorkeyev[((int)(northing)%2000000)/100000];
+    }
+    squareId[0] = horzonedesignatorkey[((int)(backgroundarr[0])-1)%3][(int)(easting/100000)-1];
+    tfp_sprintf(buff, ("%d%c %c%c %d %d"),(int)(backgroundarr[0]),latband,squareId[0],squareId[1],mgrseasting, mgrsnorthing)
+}
 #endif // USE_GPS
+
 
 void osdFormatDistanceString(char *ptr, int distance, char leadingSymbol)
 {
@@ -1212,6 +1288,15 @@ static void osdElementGpsCoordinate(osdElementParms_t *element)
     }
 }
 
+static void osdElementMgrsCoordinate(osdElementParm_t *element){
+    osdFormatMgrs(element->buff, element->type);
+    if (STATE(GPS_FIX_EVER) && !STATE(GPS_FIX)) {
+        SET_BLINK(element->item); // blink if we had a fix but have since lost it
+    } else {
+        CLR_BLINK(element->item);
+    }
+}
+
 static void osdElementGpsSats(osdElementParms_t *element)
 {
     if ((STATE(GPS_FIX) == 0) || (gpsSol.numSat < GPS_MIN_SAT_COUNT) ) {
@@ -1994,6 +2079,7 @@ const osdElementDrawFn osdElementDrawFunction[OSD_ITEM_COUNT] = {
 #ifdef USE_GPS
     [OSD_GPS_LON]                 = osdElementGpsCoordinate,
     [OSD_GPS_LAT]                 = osdElementGpsCoordinate,
+    [OSD_GPS_MGRS]                = osdElementMgrsCoordinate,
 #endif
     [OSD_DEBUG]                   = osdElementDebug,
     [OSD_DEBUG2]                  = osdElementDebug2,
@@ -2148,6 +2234,7 @@ void osdAddActiveElements(void)
         osdAddActiveElement(OSD_HOME_DIR);
         osdAddActiveElement(OSD_FLIGHT_DIST);
         osdAddActiveElement(OSD_EFFICIENCY);
+        osdAddActiveElement(OSD_GPS_MGRS);
     }
 #endif // GPS
 
