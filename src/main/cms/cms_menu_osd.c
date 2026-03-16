@@ -120,6 +120,7 @@ const OSD_Entry menuOsdActiveElemsEntries[] =
     {"GPS SATS",           OME_VISIBLE | DYNAMIC, NULL, &osdConfig_item_pos[OSD_GPS_SATS]},
     {"GPS LAT",            OME_VISIBLE | DYNAMIC, NULL, &osdConfig_item_pos[OSD_GPS_LAT]},
     {"GPS LON",            OME_VISIBLE | DYNAMIC, NULL, &osdConfig_item_pos[OSD_GPS_LON]},
+    //{"GPS MGRS",           OME_VISIBLE | DYNAMIC, NULL, $osdConfig_item_pos[OSD_GPS_MGRS]},
     {"HOME DIR",           OME_VISIBLE | DYNAMIC, NULL, &osdConfig_item_pos[OSD_HOME_DIR]},
     {"HOME DIST",          OME_VISIBLE | DYNAMIC, NULL, &osdConfig_item_pos[OSD_HOME_DIST]},
     {"FLIGHT DIST",        OME_VISIBLE | DYNAMIC, NULL, &osdConfig_item_pos[OSD_FLIGHT_DIST]},

@@ -419,11 +419,11 @@ static void osdFormatCoordinate(char *buff, gpsCoordinateType_e coordinateType, 
     }
 }
 
-osdFormatMgrs(char *buff, osdElementType_e variantType){
-    const long int divider = 10000000;
-    double lat = ((double)(gpsSol.llh.lat*divider))/divider;
-    double longitude = ((double)(gpsSol.llh.lon*divider))/divider;
+static void osdFormatMgrs(char *buff){
+    double longitude = gpsSol.llh.lon / 10000000.0;
+    double lat = abs(gpsSol.llh.lat) / 10000000.0;
 
+    
     //variable declarations
     double backgroundarr[7]; //array for map reprojection cals(utmzone, meridian, N, T, C, A, M)
     char latband;//utm lattitude band key
@@ -491,7 +491,9 @@ osdFormatMgrs(char *buff, osdElementType_e variantType){
         squareId[1] = vertzonedesignatorkeyev[((int)(northing)%2000000)/100000];
     }
     squareId[0] = horzonedesignatorkey[((int)(backgroundarr[0])-1)%3][(int)(easting/100000)-1];
-    tfp_sprintf(buff, ("%d%c %c%c %d %d"),(int)(backgroundarr[0]),latband,squareId[0],squareId[1],mgrseasting, mgrsnorthing)
+    
+    tfp_sprintf(buff,"%d%c %c%c %d %d\n",(int)(backgroundarr[0]),latband,squareId[0],squareId[1],mgrseasting, mgrsnorthing);
+    //osdPrintFloat(buff, SYM_NONE, longitude, "", 7, false, SYM_NONE);
 }
 #endif // USE_GPS
 
@@ -873,7 +875,7 @@ static void osdElementArtificialHorizon(osdElementParms_t *element)
 
 static void osdElementUpDownReference(osdElementParms_t *element)
 {
-// Up/Down reference feature displays reference points on the OSD at Zenith and Nadir
+// Up/Down reference feature displays reference points on the  at Zenith and Nadir
     const float earthUpinBodyFrame[3] = {-rMat.m[2][0], -rMat.m[2][1], -rMat.m[2][2]}; //transforum the up vector to the body frame
 
     if (fabsf(earthUpinBodyFrame[2]) < SINE_25_DEG && fabsf(earthUpinBodyFrame[1]) < SINE_25_DEG) {
@@ -1288,8 +1290,8 @@ static void osdElementGpsCoordinate(osdElementParms_t *element)
     }
 }
 
-static void osdElementMgrsCoordinate(osdElementParm_t *element){
-    osdFormatMgrs(element->buff, element->type);
+static void osdElementMgrsCoordinate(osdElementParms_t *element){
+    osdFormatMgrs(element->buff);
     if (STATE(GPS_FIX_EVER) && !STATE(GPS_FIX)) {
         SET_BLINK(element->item); // blink if we had a fix but have since lost it
     } else {
